@@ -13,11 +13,15 @@ async function startBot() {
     // Auth state akan menyimpan sesi agar tidak perlu login ulang setelah restart
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
 
-    const sock = makeWASocket({
+        const sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'info' }),
         browser: ['Bot Anonymous', 'Safari', '1.0.0'],
-        printQRInTerminal: false // Kita pakai Pairing Code saja
+        printQRInTerminal: false,
+        // Tambahkan opsi ini agar socket lebih sabar menunggu respons server
+        connectTimeoutMs: 60000, 
+        defaultQueryTimeoutMs: 60000,
+        keepAliveIntervalMs: 10000,
     });
 
     sock.ev.on('creds.update', saveCreds);
