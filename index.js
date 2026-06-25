@@ -28,7 +28,7 @@ async function startBot() {
         // --- LOGIKA PAIRING CODE (FIXED) ---
         // Jika bot belum terdaftar dan statusnya sedang connecting, minta kode
         if (connection === 'connecting' && !sock.authState.creds.registered) {
-            const phoneNumber = '6285608637146'; // Pastikan nomor benar
+            const phoneNumber = '6285713663623'; // Pastikan nomor benar
             try {
                 const code = await sock.requestPairingCode(phoneNumber);
                 console.log(`\n========================================`);
