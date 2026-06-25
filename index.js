@@ -14,14 +14,19 @@ async function startBot() {
 
     const sock = makeWASocket({
         auth: state,
-        // UBAH: Level info agar kita tahu jika ada error atau proses loading
-        logger: pino({ level: 'info' }), 
-        printQRInTerminal: true,
-        // TAMBAHAN: Untuk kompatibilitas Baileys terbaru
-        browser: ['Bot Anonymous', 'Safari', '1.0.0'] 
+        logger: pino({ level: 'info' }),
+        browser: ['Bot Anonymous', 'Safari', '1.0.0'],
+        // printQRInTerminal: true // HAPUS/COMMENT BARIS INI
     });
 
     sock.ev.on('creds.update', saveCreds);
+
+    // TAMBAHKAN BLOK INI UNTUK MEMAKSA PAIRING CODE
+    if (!sock.authState.creds.registered) {
+        const phoneNumber = '6285608637146'; // GANTI DENGAN NOMOR BOTMU (WAJIB PAKAI 62)
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log(`\n📌 KODE TAUTAN WHATSAPP ANDA: ${code}\n`);
+    }
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
