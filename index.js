@@ -43,9 +43,11 @@ async function startBot() {
             const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('Koneksi terputus. Alasan:', lastDisconnect.error?.message);
             
-            if (shouldReconnect) {
-                console.log('Mereset bot...');
-                process.exit(1); // Biarkan PM2 merestart bot
+                        if (shouldReconnect) {
+                console.log('Menunggu 10 detik sebelum menyambung ulang...');
+                // Tambahkan jeda agar server WhatsApp tidak memblokir IP STB-mu
+                await new Promise(resolve => setTimeout(resolve, 10000)); 
+                process.exit(1); 
             }
         } else if (connection === 'open') {
             console.log('\n✅ BOT BERHASIL TERHUBUNG KE WHATSAPP!\n');
