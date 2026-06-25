@@ -1,60 +1,46 @@
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason,
-} = require('@whiskeysockets/baileys');
-const pino = require('pino');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const qrcode = require("qrcode-terminal");
+const express = require("express");
+const axios = require("axios");
 
-// Variabel Penyimpanan di Memory
-let searchQueue = []; 
-let activeSessions = {}; 
+const app = express();
+app.use(express.json());
+
+// FIX 1: Deklarasi variabel antrean chat anonim secara global
+let searchQueue = [];
+const activeSessions = {};
 
 async function startBot() {
-    // Auth state akan menyimpan sesi agar tidak perlu login ulang setelah restart
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
-
-        const sock = makeWASocket({
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    
+    const sock = makeWASocket({
         auth: state,
-        logger: pino({ level: 'info' }),
-        browser: ['Bot Anonymous', 'Safari', '1.0.0'],
-        printQRInTerminal: false,
-        // Tambahkan opsi ini agar socket lebih sabar menunggu respons server
-        connectTimeoutMs: 60000, 
-        defaultQueryTimeoutMs: 60000,
-        keepAliveIntervalMs: 10000,
+        printQRInTerminal: false, // FIX 2: Matikan bawaan Baileys agar tidak double QR
+        browser: ["Windows", "Chrome", "110.0.0"] // FIX 4: Gunakan identitas browser standar biar aman
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
-        // --- LOGIKA PAIRING CODE (FIXED) ---
-        // Jika bot belum terdaftar dan statusnya sedang connecting, minta kode
-        if (connection === 'connecting' && !sock.authState.creds.registered) {
-            const phoneNumber = '6285713663623'; // Pastikan nomor benar
-            try {
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n========================================`);
-                console.log(`📌 KODE TAUTAN WHATSAPP: ${code}`);
-                console.log(`========================================\n`);
-            } catch (err) {
-                console.log('Gagal meminta Pairing Code:', err.message);
-            }
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        
+        // Render QR manual yang stabil di terminal
+        if (qr) {
+            console.log('--- SCAN QR CODE DI BAWAH INI ---');
+            qrcode.generate(qr, { small: true });
         }
-
+        
+        if (connection === 'open') {
+            console.log('\n✅ WhatsApp Terhubung! Bot Anonymous siap digunakan.');
+        }
+        
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Koneksi terputus. Alasan:', lastDisconnect.error?.message);
-            
-                        if (shouldReconnect) {
-                console.log('Menunggu 10 detik sebelum menyambung ulang...');
-                // Tambahkan jeda agar server WhatsApp tidak memblokir IP STB-mu
-                await new Promise(resolve => setTimeout(resolve, 10000)); 
-                process.exit(1); 
+            // FIX 3: Gunakan ?. agar tidak crash jika lastDisconnect kosong
+            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log(`Koneksi terputus karena: ${lastDisconnect?.error}. Mencoba menghubungkan kembali: ${shouldReconnect}`);
+            if (shouldReconnect) {
+                startBot();
             }
-        } else if (connection === 'open') {
-            console.log('\n✅ BOT BERHASIL TERHUBUNG KE WHATSAPP!\n');
         }
     });
 
@@ -120,8 +106,8 @@ async function startBot() {
         const partner = activeSessions[sender];
         if (partner && !command.startsWith('/')) {
             try {
-                const copyMessage = { forward: msg };
-                await sock.sendMessage(partner, copyMessage);
+                // Meneruskan pesan secara anonim
+                await sock.sendMessage(partner, { forward: msg });
             } catch (error) {
                 console.error("Gagal meneruskan pesan:", error);
             }
@@ -135,4 +121,8 @@ async function startBot() {
     });
 }
 
+// Menjalankan bot
 startBot();
+
+// Catatan: Express dideklarasikan tapi belum di-listen. 
+// Jika butuh port monitoring (misal untuk Replit/Koyeb), tambahkan app.listen(3000) di bawah sini.
